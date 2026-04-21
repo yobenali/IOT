@@ -15,7 +15,7 @@ Vagrant.configure("2") do |config|
     end
 
     server.vm.provision "shell", inline: <<-SHELL
-    exho "=== Installing K3s Server ==="
+    echo "=== Installing K3s Server ==="
     curl -sfL https://get.k3s.io | sh -
     sleep 10
     chmod 644 /var/lib/rancher/k3s/server/node-token   
