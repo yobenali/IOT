@@ -6,6 +6,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "yobenaliS" do |server|
     server.vm.hostname = "yobenaliS"
     server.vm.network "private_network", ip: "192.168.56.110"
+    server.vm.boot_timeout = 600
 
     server.vm.provider "virtualbox" do |vb|
       vb.memory = "1024"
@@ -35,9 +36,9 @@ Vagrant.configure("2") do |config|
 
   # Worker Node (Agent Mode) - Starts separately
   config.vm.define "yobenaliSW", autostart: false do |worker|
-    config.vm.boot_timeout = 600
     worker.vm.hostname = "yobenaliSW"
     worker.vm.network "private_network", ip: "192.168.56.111"
+    config.vm.boot_timeout = 600
     
     worker.vm.provider "virtualbox" do |vb|
       vb.memory = "1024"
