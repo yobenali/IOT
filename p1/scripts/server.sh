@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+echo "=== Installing dependencies ==="
+apt-get update -y
+apt-get install -y curl
+
 echo "=== Installing K3s in server (controller) mode ==="
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="\
   --write-kubeconfig-mode=644 \

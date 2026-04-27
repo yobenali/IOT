@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+echo "=== Installing dependencies ==="
+apt-get update -y
+apt-get install -y curl
+
 echo "=== Waiting for server API to be reachable ==="
 until curl -k -s https://192.168.56.110:6443 > /dev/null 2>&1; do
   echo "  ... waiting for server at 192.168.56.110:6443"
