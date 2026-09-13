@@ -13,16 +13,17 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL="v1.28" INSTALL_K3S_EXEC="\
   --tls-san=192.168.56.110 \
   --node-ip=192.168.56.110 \
   --advertise-address=192.168.56.110 \
-  --flannel-iface=eth1 \
+  --flannel-iface=enp0s8 \
   --prefer-bundled-bin" sh -
 
 echo "=== Waiting for K3s to be ready ==="
-until kubectl get nodes 2>/dev/null | grep -q "Ready"; do
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+until k3s kubectl get nodes 2>/dev/null | grep -q "Ready"; do
   echo "  ... waiting for node to be Ready"
   sleep 2
 done
 
-echo "=== Setting up kubectl ==="
+echo "=== Setting up kubectl for vagrant user ==="
 mkdir -p /home/vagrant/.kube
 cp /etc/rancher/k3s/k3s.yaml /home/vagrant/.kube/config
 chown -R vagrant:vagrant /home/vagrant/.kube
@@ -33,7 +34,7 @@ for BASHRC in /home/vagrant/.bashrc /root/.bashrc; do
 done
 
 echo "=== Applying app configurations ==="
-kubectl apply -f /vagrant/confs/
+k3s kubectl apply -f /vagrant/confs/
 
 echo "=== Setup complete ==="
-kubectl get all
+k3s kubectl get all
