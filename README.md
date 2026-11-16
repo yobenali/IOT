@@ -158,8 +158,8 @@ curl http://192.168.56.110                         # → Hello from app3.
 
 ## Key Technical Decisions
 
-**Why `eth1` for flannel interface?**
-In Vagrant + VirtualBox, `eth0` is the NAT interface used by Vagrant itself. `eth1` is the dedicated private network interface carrying the `192.168.56.x` subnet. Binding flannel to `eth1` ensures pod-to-pod traffic routes over the correct network.
+**Why detect the flannel interface instead of hardcoding it?**
+Interface names differ between boxes (`eth1`, `enp0s8`, ...). Each script finds the interface that owns the node's private IP (`192.168.56.110` or `.111`) and passes it to K3s with `--flannel-iface`, so provisioning doesn't depend on the base image's naming scheme.
 
 **Why token sharing via `/vagrant`?**
 Vagrant automatically mounts the project directory as `/vagrant` on all VMs simultaneously. Writing the K3s node-token to this shared folder from the server and reading it on the worker is the cleanest, most reliable approach — no SSH tunneling or manual copy needed.

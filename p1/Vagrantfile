@@ -1,8 +1,6 @@
 Vagrant.configure("2") do |config|
-  config.vm.box = "debian/bookworm64"
-  config.ssh.insert_key = false
+  config.vm.box = "bento/debian-13"
 
-  # ─── Server Node (Controller Mode) ───────────────────────────────────────────
   config.vm.define "yobenaliS" do |server|
     server.vm.hostname = "yobenaliS"
     server.vm.network "private_network", ip: "192.168.56.110"
@@ -21,7 +19,6 @@ Vagrant.configure("2") do |config|
     server.vm.provision "shell", path: "scripts/server.sh"
   end
 
-  # ─── Worker Node (Agent Mode) ─────────────────────────────────────────────────
   config.vm.define "yobenaliSW" do |worker|
     worker.vm.hostname = "yobenaliSW"
     worker.vm.network "private_network", ip: "192.168.56.111"
@@ -39,5 +36,4 @@ Vagrant.configure("2") do |config|
 
     worker.vm.provision "shell", path: "scripts/worker.sh"
   end
-
 end

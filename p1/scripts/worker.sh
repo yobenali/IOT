@@ -25,12 +25,17 @@ if [ ! -f "$TOKEN_FILE" ]; then
 fi
 TOKEN=$(cat "$TOKEN_FILE")
 
+echo "=== Detecting private network interface ==="
+NODE_IP="192.168.56.111"
+IFACE=$(ip -o -4 addr show | awk -v ip="$NODE_IP" '$4 ~ "^"ip"/" {print $2}')
+echo "Using flannel interface: $IFACE"
+
 echo "=== Installing K3s in agent mode ==="
 curl -sfL https://get.k3s.io | \
   INSTALL_K3S_CHANNEL="v1.28" \
   K3S_URL="https://192.168.56.110:6443" \
   K3S_TOKEN="${TOKEN}" \
-  INSTALL_K3S_EXEC="--node-ip=192.168.56.111 --flannel-iface=eth1 --prefer-bundled-bin" \
+  INSTALL_K3S_EXEC="--node-ip=192.168.56.111 --flannel-iface=${IFACE} --prefer-bundled-bin" \
   sh -
 
 echo "=== Waiting for agent to start ==="
