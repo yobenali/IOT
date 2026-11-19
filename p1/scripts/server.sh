@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Configuring iptables legacy for Debian 12 ==="
+echo "=== Configuring iptables legacy for Debian 13 ==="
 apt-get update -y
 apt-get install -y curl iptables
 update-alternatives --set iptables /usr/sbin/iptables-legacy || true

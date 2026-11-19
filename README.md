@@ -22,8 +22,8 @@ This project progressively builds expertise in container orchestration and infra
 | Login | Part |
 |-------|------|
 | yobenali | P1 — K3s + Vagrant, P2 — K3s + Ingress |
-| teammate2 | P3 — K3d + Argo CD |
-| teammate3 | Bonus — Gitlab |
+| aoueldma | P3 — K3d + Argo CD |
+| ael-hajj | Bonus — Gitlab |
 
 ---
 
@@ -65,7 +65,7 @@ yobenaliSW    Ready    <none>                 1m    v1.28.15+k3s1   192.168.56.1
 ```
 
 ### Stack
-`Vagrant` · `VirtualBox` · `K3s v1.28` · `Debian 12 (Bookworm)` · `kubectl`
+`Vagrant` · `VirtualBox` · `K3s v1.28` · `Debian 13` · `kubectl`
 
 ---
 
@@ -117,7 +117,7 @@ curl http://192.168.56.110                         # → Hello from app3.
 ```
 
 ### Stack
-`Vagrant` · `VirtualBox` · `K3s v1.28` · `Traefik` · `Debian 12 (Bookworm)` · `kubectl`
+`Vagrant` · `VirtualBox` · `K3s v1.28` · `Traefik` · `Debian 13` · `kubectl`
 
 ---
 
