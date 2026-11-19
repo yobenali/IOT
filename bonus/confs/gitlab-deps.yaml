@@ -1,6 +1,6 @@
-# PostgreSQL and Valkey (Redis-compatible) for GitLab.
+# PostgreSQL, Valkey (Redis-compatible) and Garage (S3 storage) for GitLab.
 # Since GitLab 19.0 (chart 10.0) the Helm chart no longer bundles them.
-# The password Secret "gitlab-postgres" is created by scripts/install.sh.
+# Their Secrets (gitlab-postgres, gitlab-garage) are created by scripts/install.sh.
 
 # ─── PostgreSQL 17 (minimum version for GitLab 19) ──────────────────────────
 apiVersion: v1
@@ -123,3 +123,90 @@ spec:
   ports:
     - port: 6379
       targetPort: 6379
+---
+# ─── Garage (S3-compatible object storage, replaces the removed MinIO) ──────
+# Single node. Layout, access key and buckets are set up by scripts/install.sh.
+# The RPC secret comes from the Secret "gitlab-garage" (created by the script).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitlab-garage-config
+  namespace: gitlab
+data:
+  garage.toml: |
+    metadata_dir = "/var/lib/garage/meta"
+    data_dir = "/var/lib/garage/data"
+    db_engine = "sqlite"
+    replication_factor = 1
+
+    rpc_bind_addr = "0.0.0.0:3901"
+    rpc_public_addr = "127.0.0.1:3901"
+
+    [s3_api]
+    s3_region = "garage"
+    api_bind_addr = "0.0.0.0:3900"
+    root_domain = ".s3.garage.localhost"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitlab-garage
+  namespace: gitlab
+spec:
+  serviceName: gitlab-garage
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab-garage
+  template:
+    metadata:
+      labels:
+        app: gitlab-garage
+    spec:
+      containers:
+        - name: garage
+          image: dxflrs/garage:v2.2.0
+          env:
+            - name: GARAGE_RPC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gitlab-garage
+                  key: rpc-secret
+          ports:
+            - containerPort: 3900
+            - containerPort: 3901
+          readinessProbe:
+            tcpSocket:
+              port: 3900
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+            - name: data
+              mountPath: /var/lib/garage
+      volumes:
+        - name: config
+          configMap:
+            name: gitlab-garage-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-garage
+  namespace: gitlab
+spec:
+  selector:
+    app: gitlab-garage
+  ports:
+    - port: 3900
+      targetPort: 3900

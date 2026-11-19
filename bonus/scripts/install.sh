@@ -101,15 +101,72 @@ log "Installing Argo CD"
 # --server-side: the ApplicationSet CRD is too big for client-side apply
 kubectl apply --server-side --force-conflicts -n argocd -f "$ARGOCD_MANIFEST"
 
-log "Installing PostgreSQL and Valkey for GitLab"
-# GitLab 19 (chart 10) no longer bundles them: they must be provided
+log "Installing PostgreSQL, Valkey and Garage for GitLab"
+# GitLab 19 (chart 10) no longer bundles a database, Redis or object storage
+hex() { od -An -tx1 -N"$1" /dev/urandom | tr -d ' \n'; }
+secret_val() {
+  kubectl -n gitlab get secret "$1" -o jsonpath="{.data.$2}" | base64 -d
+}
 if ! kubectl -n gitlab get secret gitlab-postgres >/dev/null 2>&1; then
   kubectl -n gitlab create secret generic gitlab-postgres \
-    --from-literal=psql-password="$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
+    --from-literal=psql-password="$(hex 16)"
 fi
+if ! kubectl -n gitlab get secret gitlab-garage >/dev/null 2>&1; then
+  # Garage key format: "GK" + 24 hex chars, secret = 64 hex chars
+  kubectl -n gitlab create secret generic gitlab-garage \
+    --from-literal=rpc-secret="$(hex 32)" \
+    --from-literal=access-key="GK$(hex 12)" \
+    --from-literal=secret-key="$(hex 32)"
+fi
+S3_ACCESS_KEY="$(secret_val gitlab-garage access-key)"
+S3_SECRET_KEY="$(secret_val gitlab-garage secret-key)"
+
 kubectl apply -f "$CONFS/gitlab-deps.yaml"
 kubectl -n gitlab rollout status statefulset/gitlab-postgres --timeout=300s
 kubectl -n gitlab rollout status deployment/gitlab-valkey --timeout=300s
+kubectl -n gitlab rollout status statefulset/gitlab-garage --timeout=300s
+
+log "Configuring Garage (layout, access key, buckets)"
+gar() { kubectl -n gitlab exec gitlab-garage-0 -- /garage "$@"; }
+for _ in $(seq 1 30); do gar status >/dev/null 2>&1 && break; sleep 2; done
+
+LAYOUT_VERSION="$(gar layout show | grep -oiE 'layout version: [0-9]+' | grep -oE '[0-9]+' | head -n1 || true)"
+if [ "${LAYOUT_VERSION:-0}" = "0" ]; then
+  NODE_ID="$(gar node id -q | cut -d@ -f1)"
+  gar layout assign -z dc1 -c 10G "$NODE_ID"
+  gar layout apply --version 1
+fi
+
+gar key info "$S3_ACCESS_KEY" >/dev/null 2>&1 \
+  || gar key import --yes -n gitlab "$S3_ACCESS_KEY" "$S3_SECRET_KEY"
+
+for bucket in git-lfs gitlab-artifacts gitlab-uploads gitlab-packages \
+              gitlab-mr-diffs gitlab-terraform-state gitlab-ci-secure-files \
+              gitlab-dependency-proxy gitlab-pages gitlab-backups tmp; do
+  gar bucket info "$bucket" >/dev/null 2>&1 || gar bucket create "$bucket"
+  gar bucket allow --read --write --owner "$bucket" --key "$S3_ACCESS_KEY" >/dev/null
+done
+
+# Connection Secrets for GitLab (Rails) and the toolbox (s3cmd, backups)
+S3_HOST="gitlab-garage.gitlab.svc.cluster.local:3900"
+kubectl -n gitlab create secret generic gitlab-object-storage \
+  --dry-run=client -o yaml --from-literal=config="provider: AWS
+region: garage
+aws_access_key_id: $S3_ACCESS_KEY
+aws_secret_access_key: $S3_SECRET_KEY
+endpoint: \"http://$S3_HOST\"
+path_style: true
+" | kubectl apply -f -
+kubectl -n gitlab create secret generic gitlab-object-storage-s3cmd \
+  --dry-run=client -o yaml --from-literal=config="[default]
+access_key = $S3_ACCESS_KEY
+secret_key = $S3_SECRET_KEY
+bucket_location = garage
+host_base = $S3_HOST
+host_bucket = $S3_HOST
+use_https = False
+signature_v2 = False
+" | kubectl apply -f -
 
 log "Installing GitLab (latest official Helm chart)"
 helm repo add gitlab https://charts.gitlab.io/ --force-update

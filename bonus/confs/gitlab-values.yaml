@@ -35,6 +35,34 @@ global:
       enabled: false
   minio:
     enabled: false
+  # Object storage on Garage (confs/gitlab-deps.yaml). The connection Secret
+  # "gitlab-object-storage" and the buckets are created by scripts/install.sh.
+  appConfig:
+    object_store:
+      enabled: true
+      proxy_download: true   # storage is not exposed through the ingress
+      connection:
+        secret: gitlab-object-storage
+        key: config
+    lfs:
+      bucket: git-lfs
+    artifacts:
+      bucket: gitlab-artifacts
+    uploads:
+      bucket: gitlab-uploads
+    packages:
+      bucket: gitlab-packages
+    externalDiffs:
+      bucket: gitlab-mr-diffs
+    terraformState:
+      bucket: gitlab-terraform-state
+    ciSecureFiles:
+      bucket: gitlab-ci-secure-files
+    dependencyProxy:
+      bucket: gitlab-dependency-proxy
+    backups:
+      bucket: gitlab-backups
+      tmpBucket: tmp
 
 postgresql:
   install: false
@@ -66,6 +94,12 @@ gitlab:
     enabled: false
   gitlab-exporter:
     enabled: false
+  toolbox:
+    backups:
+      objectStorage:
+        config:
+          secret: gitlab-object-storage-s3cmd
+          key: config
   webservice:
     minReplicas: 1
     maxReplicas: 1
