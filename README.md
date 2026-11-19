@@ -121,6 +121,59 @@ curl http://192.168.56.110                         # → Hello from app3.
 
 ---
 
+## Bonus — Local GitLab as the GitOps Source
+
+Same pipeline as Part 3, but Argo CD pulls from a GitLab instance running **inside the cluster** (namespace `gitlab`) instead of GitHub.
+
+### Architecture
+
+```
+  git push ──▶ http://gitlab.localhost ──▶ Traefik ──▶ GitLab (ns: gitlab)
+                                                          │
+                       Argo CD (ns: argocd) ◀── polls ────┘  (in-cluster Service URL)
+                              │
+                              └── syncs ──▶ wil-playground (ns: dev) ──▶ localhost:8888
+```
+
+### What it does
+- Creates a K3d cluster `bonus` (host ports `80` → Traefik, `8888` → app)
+- Installs the **latest** GitLab CE with the official Helm chart (`gitlab/gitlab`), with optional parts turned off (runner, registry, Prometheus, cert-manager, nginx, SSH)
+- Installs Argo CD in `argocd`
+- Creates a root access token, a public project `root/aoueldma`, and pushes `manifests/deployment.yaml` (v1) to it
+- Leaves a ready-to-push clone in `~/aoueldma-gitlab`
+- Creates the Argo CD Application with source `http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/aoueldma.git`
+
+### Requirements
+- Debian/Ubuntu VM with **at least 4 CPUs and 8 GB RAM** (GitLab is heavy)
+- Ports 80 and 8888 free. Delete the P3 cluster first: `k3d cluster delete p3`
+
+### How to run
+```bash
+sudo bash bonus/scripts/install.sh   # 15-25 minutes the first time
+```
+
+### How to test
+```bash
+kubectl get ns                       # argocd, dev, gitlab
+kubectl get pods -n gitlab
+curl http://localhost:8888           # {"status":"ok", "message": "v1"}
+
+cd ~/aoueldma-gitlab
+sed -i 's/wil42\/playground:v1/wil42\/playground:v2/g' manifests/deployment.yaml
+git commit -am v2 && git push
+
+# Argo CD polls every ~3 minutes (or press "Refresh" in the UI)
+curl http://localhost:8888           # {"status":"ok", "message": "v2"}
+```
+
+GitLab UI: `http://gitlab.localhost` (user `root`, password printed at the end of the script, or
+`kubectl -n gitlab get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' | base64 -d`).
+
+### Stack
+`K3d` · `Helm` · `GitLab CE` · `Argo CD` · `Traefik` · `Docker`
+
+---
+
 ## Repository Structure
 
 ```
@@ -151,7 +204,13 @@ curl http://192.168.56.110                         # → Hello from app3.
 │
 └── bonus/
     ├── scripts/
+    │   └── install.sh         # K3d + GitLab (Helm) + Argo CD, repo bootstrap
     └── confs/
+        ├── namespaces.yaml    # argocd, dev, gitlab
+        ├── gitlab-values.yaml # Helm values for the official GitLab chart
+        ├── application.yaml   # Argo CD Application pointing to the local GitLab
+        └── manifests/
+            └── deployment.yaml # App manifest pushed to GitLab (v1)
 ```
 
 ---

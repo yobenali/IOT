@@ -1,0 +1,51 @@
+# Helm values for the official GitLab chart (https://charts.gitlab.io)
+# Minimal single-node setup: GitLab CE behind the K3s built-in Traefik,
+# plain HTTP on http://gitlab.localhost, optional components turned off.
+
+global:
+  edition: ce
+  hosts:
+    domain: localhost
+    https: false
+    gitlab:
+      name: gitlab.localhost
+      https: false
+  ingress:
+    class: traefik
+    configureCertmanager: false
+    tls:
+      enabled: false
+  kas:
+    enabled: false
+
+# No TLS, so no cert-manager. The chart still checks that an email is set.
+installCertmanager: false
+certmanager-issuer:
+  email: admin@example.com
+
+# K3s already ships Traefik as ingress controller
+nginx-ingress:
+  enabled: false
+
+# Not needed for the lab: saves several GB of RAM
+prometheus:
+  install: false
+gitlab-runner:
+  install: false
+registry:
+  enabled: false
+upgradeCheck:
+  enabled: false
+
+gitlab:
+  # Git over SSH is not used: Argo CD and the user both clone over HTTP
+  gitlab-shell:
+    enabled: false
+  gitlab-exporter:
+    enabled: false
+  webservice:
+    minReplicas: 1
+    maxReplicas: 1
+  sidekiq:
+    minReplicas: 1
+    maxReplicas: 1
