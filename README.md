@@ -207,6 +207,7 @@ GitLab UI: `http://gitlab.localhost` (user `root`, password printed at the end o
     │   └── install.sh         # K3d + GitLab (Helm) + Argo CD, repo bootstrap
     └── confs/
         ├── namespaces.yaml    # argocd, dev, gitlab
+        ├── gitlab-deps.yaml   # PostgreSQL 17 + Valkey (no longer bundled since GitLab 19)
         ├── gitlab-values.yaml # Helm values for the official GitLab chart
         ├── application.yaml   # Argo CD Application pointing to the local GitLab
         └── manifests/

@@ -17,6 +17,29 @@ global:
       enabled: false
   kas:
     enabled: false
+  # External PostgreSQL / Valkey from confs/gitlab-deps.yaml
+  # (GitLab 19 / chart 10 no longer bundles them)
+  psql:
+    host: gitlab-postgres.gitlab.svc.cluster.local
+    port: 5432
+    database: gitlabhq_production
+    username: gitlab
+    password:
+      useSecret: true
+      secret: gitlab-postgres
+      key: psql-password
+  redis:
+    host: gitlab-valkey.gitlab.svc.cluster.local
+    port: 6379
+    auth:
+      enabled: false
+  minio:
+    enabled: false
+
+postgresql:
+  install: false
+redis:
+  install: false
 
 # No TLS, so no cert-manager. The chart still checks that an email is set.
 installCertmanager: false

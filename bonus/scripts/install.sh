@@ -101,6 +101,16 @@ log "Installing Argo CD"
 # --server-side: the ApplicationSet CRD is too big for client-side apply
 kubectl apply --server-side --force-conflicts -n argocd -f "$ARGOCD_MANIFEST"
 
+log "Installing PostgreSQL and Valkey for GitLab"
+# GitLab 19 (chart 10) no longer bundles them: they must be provided
+if ! kubectl -n gitlab get secret gitlab-postgres >/dev/null 2>&1; then
+  kubectl -n gitlab create secret generic gitlab-postgres \
+    --from-literal=psql-password="$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
+fi
+kubectl apply -f "$CONFS/gitlab-deps.yaml"
+kubectl -n gitlab rollout status statefulset/gitlab-postgres --timeout=300s
+kubectl -n gitlab rollout status deployment/gitlab-valkey --timeout=300s
+
 log "Installing GitLab (latest official Helm chart)"
 helm repo add gitlab https://charts.gitlab.io/ --force-update
 helm repo update gitlab

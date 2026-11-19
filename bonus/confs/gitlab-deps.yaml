@@ -1,0 +1,125 @@
+# PostgreSQL and Valkey (Redis-compatible) for GitLab.
+# Since GitLab 19.0 (chart 10.0) the Helm chart no longer bundles them.
+# The password Secret "gitlab-postgres" is created by scripts/install.sh.
+
+# ─── PostgreSQL 17 (minimum version for GitLab 19) ──────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitlab-postgres-init
+  namespace: gitlab
+data:
+  # Extensions GitLab needs; run once, when the database is first created
+  extensions.sql: |
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    CREATE EXTENSION IF NOT EXISTS btree_gist;
+    CREATE EXTENSION IF NOT EXISTS plpgsql;
+    CREATE EXTENSION IF NOT EXISTS amcheck;
+    CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitlab-postgres
+  namespace: gitlab
+spec:
+  serviceName: gitlab-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab-postgres
+  template:
+    metadata:
+      labels:
+        app: gitlab-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17
+          env:
+            - name: POSTGRES_USER
+              value: gitlab
+            - name: POSTGRES_DB
+              value: gitlabhq_production
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gitlab-postgres
+                  key: psql-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "gitlab", "-d", "gitlabhq_production"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init
+          configMap:
+            name: gitlab-postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-postgres
+  namespace: gitlab
+spec:
+  selector:
+    app: gitlab-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# ─── Valkey 8 (Redis-compatible, GitLab needs >= 7.2) ───────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab-valkey
+  namespace: gitlab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab-valkey
+  template:
+    metadata:
+      labels:
+        app: gitlab-valkey
+    spec:
+      containers:
+        - name: valkey
+          image: valkey/valkey:8.1
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["valkey-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-valkey
+  namespace: gitlab
+spec:
+  selector:
+    app: gitlab-valkey
+  ports:
+    - port: 6379
+      targetPort: 6379
